@@ -3,6 +3,11 @@ uuid = "f71ebec3-2d48-4932-a53f-e943fca6a017"
 authors = ["ErrolSeders <errolbucy@gmail.com>"]
 version = "1.0.0-DEV"
 
+[deps]
+ComplexPaths = "a25e2219-d8cc-47b2-bc88-9b0dc7d4b2a3"
+GilbertCurves = "88fa7841-ef32-4516-bb70-c6ec135699d9"
+Intervals = "d8418881-c3e1-53bb-8760-2df7ec849ed5"
+
 [compat]
 julia = "1"
 
