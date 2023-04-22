@@ -4,6 +4,8 @@ using GilbertCurves
 using ComplexPaths
 using Intervals
 
+import ComplexPaths: pointsonpath
+
 export HilbertPath, pointsonpath
 
 function _genplane(min_coord::Complex, max_coord::Complex, width::Integer, height::Integer)
@@ -20,11 +22,11 @@ function _genplane(min_coord::Complex, max_coord::Complex, width::Integer, heigh
     return complexplane
 end
 
-_linearinterplambda(startp,endp) = eval(Meta.parse("t ->  $startp + t*($(endp - startp))"))
+#! Is there a less awkward way to achieve this type of function construction? A macro potentially?
 
-function _build_piecewise_dict(points) 
+_linear_interp_lambda(startp,endp) = eval(Meta.parse("t ->  $startp + t*($(endp - startp))"))
 
-    out = Dict{Interval, Function}()
+function _build_hilbert_path(points) 
 
     indexes = points |> size |> gilbertindices
 
@@ -33,68 +35,44 @@ function _build_piecewise_dict(points)
     @assert length(li) == length(ri)
 
     indexpairs = [(li[i], ri[i]) for i ∈ eachindex(li)]
-    num_partitions = length(indexpairs)
+    
+    paths = Vector{Path}()
 
-    partition = range(0.0, 10.0, length = num_partitions) |> collect
-    lb = partition[1:end-1]
-    rb = partition[2:end]
-    @assert length(lb) == length(rb)
-    bounds = [(lb[i], rb[i]) for i ∈ eachindex(lb)]
+    for ii ∈ indexpairs
+        
+        startp = points[ii[1]]
+        endp = points[ii[2]]
+    
+        path = Path(_linear_interp_lambda(startp,endp),0..1)
+        push!(paths,path)
 
-    for (i,b) ∈ enumerate(bounds[1:end-1])
-        startp = points[indexpairs[i][1]]
-        endp = points[indexpairs[i][2]]
-
-        pair = Interval{Closed,Open}(b[1],b[2]) => _linearinterplambda(startp,endp)
-        push!(out, pair)
     end
 
-    laststartp = points[indexpairs[end][1]]
-    lastendpdiff = points[indexpairs[end][2]] - laststartp
-    last_pair = bounds[end][1]..bounds[end][2] => (t -> laststartp + t*(lastendpdiff))
-    push!(out,last_pair)
-
-    @assert foldl(intersect, out |> keys) |> isempty
+    out = PiecewisePath(paths...)
 
     return out
 end
 
-function _call_hilbertpath(t::Real, D::AbstractDict)
-    for (key,value) ∈ D
-        if t ∈ key
-            t_map = (t - key.first) / (key.last - key.first)
-            f = value
-            return f(t_map)
-        end
-    end
-end
-
 struct HilbertPath <: AbstractPath
-    parameterization::Function
-    start::Real
-    ending::Real
-    piecewise::Dict{Interval,Function}
+    piecewise::PiecewisePath
+    domain::Interval
     depth::Int
     subdivision::Int
     
     function HilbertPath(depth,min_coord,max_coord) 
         subdivision = 4
         plane = _genplane(min_coord,max_coord,depth*subdivision,depth*subdivision)
-        dict = _build_piecewise_dict(plane)
-        _call_hilbert_internal(t) = _call_hilbertpath(t,dict)
-        new(    _call_hilbert_internal,
-                0.0,
-                1.0,
-                dict,
+        piecewise = _build_hilbert_path(plane)
+        new(    piecewise,
+                piecewise.domain,
                 depth,
                 subdivision,
         )
     end
 end
 
-function pointsonpath(H::HilbertPath, n::Integer)
-    @assert n > 0 "n must be a positive non-zero integer"
-    return [P.parameterization(t,H.piecewise) for t in range(P.start, P.ending, length=n)]
+function ComplexPaths.pointsonpath(H::HilbertPath, n::Integer)
+    pointsonpath(H.piecewise,n)
 end 
-    
+
 end
